@@ -84,6 +84,7 @@ namespace Excel
             xlBook.SaveCopyAs(strFileName);
             xlBook.Close(false);
 
+            /*
             if (xlApp != null)
             {
                 xlApp.Workbooks.Close();
@@ -93,21 +94,13 @@ namespace Excel
                 xlApp = null;
                 GC.Collect(generation);
             }
+            */
+
             GC.Collect();
             Process[] excelProc = Process.GetProcessesByName("EXCEL");
-            DateTime startTime = default(DateTime);
-            int killId = 0;
-            for (int j = 0; j < excelProc.Length; j++)
+            foreach (Process p in excelProc)
             {
-                if (startTime < excelProc[j].StartTime)
-                {
-                    startTime = excelProc[j].StartTime;
-                    killId = j;
-                }
-            }
-            if (!excelProc[killId].HasExited)
-            {
-                excelProc[killId].Kill();
+                p.Kill();
             }
             
         }

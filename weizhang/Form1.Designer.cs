@@ -92,6 +92,7 @@
             this.MinimumSize = new System.Drawing.Size(455, 155);
             this.Name = "Form1";
             this.Text = "车辆违章信息查询";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Load += new System.EventHandler(this.Form1_Load);
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();

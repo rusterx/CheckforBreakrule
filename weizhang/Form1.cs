@@ -61,6 +61,16 @@ namespace weizhang
             bwTime.DoWork += new DoWorkEventHandler(UpdateTime);
         }
 
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            GC.Collect();
+            Process[] excelProc = Process.GetProcessesByName("EXCEL");
+            foreach (Process p in excelProc)
+            {
+                p.Kill();
+            }
+        }
+
 
 
         /// <summary>
@@ -300,5 +310,7 @@ namespace weizhang
             }
             btnImport.Enabled = true;
         }
+
+
     }
 }
