@@ -11,9 +11,36 @@ namespace weizhang
 {
 	public class ValidCodeBll
 	{
-        //default url
+        // 网址设置
         public string mainUrl = "http://219.153.5.18:2333/cxxt/jdccxjg.html";
         public string imageUrl = "http://219.153.5.18:2333/cxxt/captcha-image.html";
+        
+        /// <summary>
+        /// 检查网络连通性选择这个函数
+        /// </summary>
+        /// <param name="cardNo"></param>
+        /// <param name="vinNo"></param>
+        /// <returns></returns>
+        public string GetStatus(string cardNo, string vinNo)
+        {
+            string result = this.GetResponse(cardNo, vinNo);
+            if (result == "Error")
+            {
+                return "Retry";
+            }
+            else
+            {
+                return "OK";
+            }
+        }
+
+
+        /// <summary>
+        /// 正常请求，选择这个函数
+        /// </summary>
+        /// <param name="cardNo"></param>
+        /// <param name="vinNo"></param>
+        /// <returns></returns>
 		public string GetCheckResult(string cardNo, string vinNo)
 		{
 			string result = this.GetResponse(cardNo, vinNo);
@@ -56,13 +83,24 @@ namespace weizhang
 			result = "Y";
 			return result;
 		}
+
+        /// <summary>
+        /// 封装返回请求
+        /// </summary>
+        /// <param name="cardNo"></param>
+        /// <param name="vinNo"></param>
+        /// <returns></returns>
 		private string GetResponse(string cardNo, string vinNo)
 		{
 			string cookie = string.Empty;
 			string result;
 			do
 			{
-                Bitmap img = ValidCodeBll.GetImage(imageUrl, false, out cookie); 
+                Bitmap img = ValidCodeBll.GetImage(imageUrl, false, out cookie);
+                if (img == null)
+                {
+                    return "Error";
+                }
 				string code = Captcha.ParseValidateCode(img, false);
 				string postData = string.Concat(new string[]
 				{
@@ -81,6 +119,15 @@ namespace weizhang
 			while (!(result != "1"));
 			return result;
 		}
+
+
+        /// <summary>
+        /// 主要的请求函数
+        /// </summary>
+        /// <param name="paramData"></param>
+        /// <param name="dataEncode"></param>
+        /// <param name="cookie"></param>
+        /// <returns></returns>
 		private string PostWebRequest(string paramData, Encoding dataEncode, string cookie)
 		{
             string postUrl = mainUrl;
@@ -106,23 +153,41 @@ namespace weizhang
                 response.Close();
                 newStream.Close();
 			}
-			catch (Exception)
+			catch
 			{
                 return "Error";
 			}
 			return ret;
 		}
+
+
+        /// <summary>
+        /// 获取验证码图片
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="local"></param>
+        /// <param name="cookie"></param>
+        /// <returns></returns>
 		public static Bitmap GetImage(string url, bool local, out string cookie)
 		{
-			WebRequest request = WebRequest.Create(url);
-			WebResponse response = request.GetResponse();
-			cookie = response.Headers.Get("Set-Cookie");
-			Stream st = response.GetResponseStream();
-			Bitmap bitmap = (Bitmap)Image.FromStream(st);
-			st.Dispose();
-			request.Abort();
-			response.Close();
-			return bitmap;
+            try
+            {
+                WebRequest request = WebRequest.Create(url);
+                WebResponse response = request.GetResponse();
+                //获得cookie
+                cookie = response.Headers.Get("Set-Cookie");
+                Stream st = response.GetResponseStream();
+                Bitmap bitmap = (Bitmap)Image.FromStream(st);
+                st.Dispose();
+                request.Abort();
+                response.Close();
+                return bitmap;
+            }
+            catch
+            {
+                cookie = null;
+                return null;
+            }
 		}
 	}
 }

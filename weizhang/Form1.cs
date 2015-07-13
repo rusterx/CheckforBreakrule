@@ -38,11 +38,14 @@ namespace weizhang
         //两个公有类
         private ExcelHelper eh;
         private ValidCodeBll codeBll;
+        
 
         //是否停止更新UI
         private bool statusStop = true;
         private bool timeStop = true;
         private bool isError = true;
+
+        int currentNum = 0;
 
         //代理网络内容获取
         public delegate void CallBackDelegate();
@@ -61,6 +64,7 @@ namespace weizhang
             bwTime.DoWork += new DoWorkEventHandler(UpdateTime);
         }
 
+
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             GC.Collect();
@@ -70,7 +74,6 @@ namespace weizhang
                 p.Kill();
             }
         }
-
 
 
         /// <summary>
@@ -87,6 +90,7 @@ namespace weizhang
             }
 
             isError = false;
+            currentNum = 0;
 
             //更新域名
             string domainPath = Path.Combine(Application.StartupPath, "domain.txt");
@@ -205,47 +209,64 @@ namespace weizhang
             codeBll.mainUrl = mainUrl;
             codeBll.imageUrl = imageUrl;
 
-            int i = 0;
             int inditator = vehicleLs.Count;
             string tempResult = "";
             
             foreach (MVehicle temp in vehicleLs)
             {
-                i += 1;
-                //访问网络是会阻塞UI线程的
+ 
                 tempResult = codeBll.GetCheckResult(temp.CardNo, temp.VinNo);
+
+                //选择
                 if (tempResult == "SaveAndExit")
                 {
-                    label1.Text = "正在保存结果，程序即将退出...";
-                    isError = true;
-                    CallBack();
-                    Application.Exit();
+                    status = "正在保存结果，程序即将退出...";
+                    //如果网络已经异常，说明工作已经保存
+                    if (isError)
+                    {
+                        System.Environment.Exit(0);
+                    }
+                    else
+                    {
+                        isError = true;
+                        CallBack();
+                        System.Environment.Exit(0);
+                    }      
                 }
+
                 if (tempResult == "Retry")
                 {
-                    label1.Text = "正在重试重新连接,已为您保存最后的工作...";
+                    status = "正在重试重新连接,已为您保存最后的工作...";
                     isError = true;
                     CallBack();
                 }
+
                 while (tempResult == "Retry")
-                {
-                    tempResult = codeBll.GetCheckResult(temp.CardNo, temp.VinNo);
+                {      
+                    //隔1秒查询一下网络状态
+                    Thread.Sleep(1000);
+                    tempResult = codeBll.GetStatus(temp.CardNo, temp.VinNo);
+                    if (tempResult == "OK")
+                    {
+                        isError = false;
+                        break;
+                    }
                 }
+
                 temp.CheckResult = tempResult;
+                currentNum = currentNum + 1;
                 string formatString = "正在获取车牌号为{0}的违章信息({1}/{2})...";
-                status = String.Format(formatString, temp.CardNo,i,inditator);
-                
+                status = String.Format(formatString, temp.CardNo,currentNum,inditator);             
             }
 
             //停止后台线程更新界面
             statusStop = true;
             timeStop = true;
-
             toolStripStatusLabel2.Text = "查询结束";
-
             CallBackDelegate cbd = new CallBackDelegate(CallBack);
             this.Invoke(cbd);
         }
+
 
         /// <summary>
         /// 由于子线程会阻塞SaveFileDialog，所以利用委托，当子线完成任务是，委托他去主线程把
@@ -255,38 +276,32 @@ namespace weizhang
         {
 
             System.Data.DataTable dt = new System.Data.DataTable();
-            //dt.Columns.Add("车牌号", Type.GetType("System.String"));
-            //dt.Columns.Add("车架号", Type.GetType("System.String"));
-            //DataColumn dc = new DataColumn("结果", Type.GetType("System.String"));
-            //dt.Columns.Add(dc);
-
             string fileName = "";
             string currentTim = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
 
-            int index = 0;
-            foreach (MVehicle temp2 in vehicleLs)
+
+            for (int i = 0; i < currentNum;i++)
             {
-                if (index == 0)
+                if (i == 0)
                 {
-                    //添加表头
+                    //如果异常退出，需要表明结果是异常退出的结果
                     if (isError)
                     {
-                        currentTim += "_异常退出";
+                        currentTim += "_网络异常自动备份";
                     }
-                    fileName += temp2.CardNo + "查询结果" + currentTim + ".xlsx";
-                    dt.Columns.Add(temp2.CardNo, Type.GetType("System.String"));
-                    dt.Columns.Add(temp2.CheckResult, Type.GetType("System.String"));
+                    fileName += vehicleLs[i].CardNo + "查询结果" + currentTim + ".xlsx";
+                    dt.Columns.Add(vehicleLs[i].CardNo, Type.GetType("System.String"));
+                    dt.Columns.Add(vehicleLs[i].CheckResult, Type.GetType("System.String"));
                 }
                 else
-                {                
+                {
                     DataRow dr = dt.NewRow();
-                    dr[0] = temp2.CardNo;
-                    dr[1] = temp2.CheckResult;
+                    dr[0] = vehicleLs[i].CardNo;
+                    dr[1] = vehicleLs[i].CheckResult;
                     dt.Rows.Add(dr);
                 }
-                index++;
-
             }
+
 
             //是否存在“查询结果”文件夹，不存在则创建，否则不动
             string dir = Path.Combine(Application.StartupPath, "查询结果");
@@ -297,20 +312,16 @@ namespace weizhang
                 di.Create();
             }
 
-            //存储结果，提示完成
-            eh.DataTabletoExcel(dt, fullpath);
+            //存储结果
+            eh.DataTabletoExcel(dt, fullpath,currentNum);
 
+
+            //正常的情况下，完成工作进行提示
             if (!isError)
             {
                 MessageBox.Show("查询结束!");
-            }
-            else
-            {
-                MessageBox.Show("程序异常退出，已经保存当前工作");
-            }
-            btnImport.Enabled = true;
+                btnImport.Enabled = true;
+            }         
         }
-
-
     }
 }

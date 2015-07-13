@@ -1,16 +1,32 @@
 ﻿using System;
 using System.Data;
 using System.Data.OleDb;
-using Microsoft.Office.Interop.Excel;
+using ExcelApp=Microsoft.Office.Interop.Excel;
 using System.Web;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace Excel
 {
     public class ExcelHelper
     {
 
+
+        [System.Flags]
+        public enum HDR
+        {
+            NO=0,
+            YES=1
+        }
+
+
+        /// <summary>
+        /// 将Excel转化成表格
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <param name="hdr"></param>
+        /// <returns></returns>
         public System.Data.DataTable ExcelToDataTable(string fileName,HDR hdr)
         {
             System.Data.DataTable dt;
@@ -26,44 +42,48 @@ namespace Excel
             return dt;
         }
 
-        [System.Flags]
-        public enum HDR
-        {
-            NO=0,
-            YES=1
-        }
 
 
-        public void DataTabletoExcel(System.Data.DataTable tmpDataTable, string strFileName)
+        /// <summary>
+        /// 将表格转换成Excel表格
+        /// </summary>
+        /// <param name="tmpDataTable"></param>
+        /// <param name="strFileName"></param>
+        /// <param name="rows"></param>
+        public void DataTabletoExcel(System.Data.DataTable tmpDataTable, string strFileName, int rows)
         {
 
             if (tmpDataTable == null)
                 return;
+
+            //暂时没明白
+            if (rows == 0)
+            {
+                MessageBox.Show("你当前的任务数量为0，程序无法为您保存结果！");
+                KillExcel();
+                return;
+            }
 
             int rowNum = tmpDataTable.Rows.Count;
             int columnNum = tmpDataTable.Columns.Count;
             int rowIndex = 1;
             int columnIndex = 0;
 
-            Application xlApp = new Application();
+            ExcelApp.Application xlApp = new ExcelApp.Application();
             xlApp.DefaultFilePath = "";
             xlApp.DisplayAlerts = true;
             xlApp.SheetsInNewWorkbook = 1;
-            Workbook xlBook = xlApp.Workbooks.Add(true);
+            ExcelApp.Workbook xlBook = xlApp.Workbooks.Add(true);
 
-
-            //将Cell格式设置成文本
-
-            //将DataTable的列名导入Excel表第一行
             foreach (DataColumn dc in tmpDataTable.Columns)
             {
                 columnIndex++;
                 xlApp.Cells[rowIndex, columnIndex] = dc.ColumnName;
             }
-            //将DataTable中的数据导入Excel中
+
             for (int i = 0; i < rowNum; i++)
             {
-
+                
                 rowIndex++;
                 columnIndex = 0;
                 for (int j = 0; j < columnNum; j++)
@@ -71,39 +91,46 @@ namespace Excel
                     columnIndex++;
                     if (tmpDataTable.Rows[i][j].ToString()[0]=='0')
                     {
-                        ((Range)(xlApp.Cells[rowIndex, columnIndex])).NumberFormat = "@";
+                        ((ExcelApp.Range)(xlApp.Cells[rowIndex, columnIndex])).NumberFormat = "@";
                     }
                     xlApp.Cells[rowIndex, columnIndex] = tmpDataTable.Rows[i][j].ToString();
 
                 }
             }
 
-            Range cells = xlBook.Worksheets[1].Cells;
-            cells.HorizontalAlignment = XlHAlign.xlHAlignLeft;
-
+            ExcelApp.Range cells = xlBook.Worksheets[1].Cells;
+            cells.HorizontalAlignment = ExcelApp.XlHAlign.xlHAlignLeft;
             xlBook.SaveCopyAs(strFileName);
             xlBook.Close(false);
 
-            /*
-            if (xlApp != null)
-            {
-                xlApp.Workbooks.Close();
-                xlApp.Quit();
-                int generation = GC.GetGeneration(xlApp);
-                Marshal.ReleaseComObject(xlApp);
-                xlApp = null;
-                GC.Collect(generation);
-            }
-            */
+            KillExcel();
+            
+        }
 
+        /// <summary>
+        /// 结束Excel进程
+        /// </summary>
+        public void KillExcel()
+        {
             GC.Collect();
             Process[] excelProc = Process.GetProcessesByName("EXCEL");
             foreach (Process p in excelProc)
             {
                 p.Kill();
             }
-            
         }
-
     }
 }
+
+
+/*
+if (xlApp != null)
+{
+    xlApp.Workbooks.Close();
+    xlApp.Quit();
+    int generation = GC.GetGeneration(xlApp);
+    Marshal.ReleaseComObject(xlApp);
+    xlApp = null;
+    GC.Collect(generation);
+}
+*/
